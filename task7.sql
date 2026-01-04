@@ -8,11 +8,7 @@ WITH city_stats AS (
         ROW_NUMBER() OVER (
             PARTITION BY c.city_id 
             ORDER BY SUM(f.length) DESC
-        ) as rank,
-        CASE 
-            WHEN c.city LIKE '%-%' THEN 'Has dash'
-            ELSE 'No dash'
-        END as city_type
+        ) as rank
     FROM city c
     JOIN address a ON c.city_id = a.city_id
     JOIN customer cust ON a.address_id = cust.address_id
@@ -23,18 +19,31 @@ WITH city_stats AS (
     JOIN category cat ON fc.category_id = cat.category_id
     WHERE f.title ILIKE 'a%'
     GROUP BY c.city_id, c.city, cat.category_id, cat.name
+),
+top_categories AS (
+    SELECT 
+        city_id,
+        city,
+        category_name,
+        ROUND(total_minutes / 60.0, 2) as total_hours
+    FROM city_stats
+    WHERE rank = 1
 )
 SELECT 
-    city_type,
+    'All cities (movies starting with A)' as query_type,
     city,
     category_name,
-    ROUND(total_minutes / 60.0, 2) as total_hours
-FROM city_stats
-WHERE rank = 1
-ORDER BY 
-    city_type,
-    CASE city_type 
-        WHEN 'Has dash' THEN 1 
-        ELSE 2 
-    END,
-    city;
+    total_hours
+FROM top_categories
+ORDER BY city
+
+UNION ALL
+
+SELECT 
+    'Cities with "-" (movies starting with A)' as query_type,
+    city,
+    category_name,
+    total_hours
+FROM top_categories
+WHERE city LIKE '%-%'
+ORDER BY query_type, city;
